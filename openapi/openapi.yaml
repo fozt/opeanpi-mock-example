@@ -1,0 +1,771 @@
+openapi: 3.0.3
+info:
+  title: ONB Express - OpenAPI 3.0
+  description: 'API For Mobile Aps '
+  contact:
+    email: pavel.buzdanov7@gmail.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+tags:
+  - name: account
+    description: Aутентификации пользователя
+  - name: products
+    description: Операции с получение продуктов
+  - name: user
+    description: Загрузга профиля юзера и отдельных параметров
+  - name: order
+    description: Операции формлением заказа
+paths:
+  /account/phone/requestCode:
+    get:
+      tags:
+        - account
+      summary: Запрос для получения кода по SMS
+      description: >-
+        Данный endpoint позволяет отправить номер на который нужно отправить SMS
+        c OTP токеном авторизации.
+      operationId: requestCode
+      parameters:
+        - name: phoneNumber
+          in: query
+          description: Номер телефона на который надо отправить сообщение
+          required: true
+          explode: true
+          schema:
+            type: string
+            default: 79203138017
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: SMS code has been sent to your phone number
+          headers:
+            AuthChallange:
+             schema:
+              type: string
+             description: Код который нудно будет прокинуть в /account/phone/login
+               
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Failed to send SMS code
+  /account/phone/login:
+    post:
+      tags:
+        - account
+      summary: Отправка кода, полученного из SMS
+      description: Позволяет отправить OTP код из SMS для подтвержения аутентификации.
+      operationId: sendSMS
+      requestBody:
+        description: Json с кодом из SMS и номер телефона
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthPayload'
+      responses:
+        '200':
+          description: >-
+            В ответе получем accessToken c помошью которого будут проиходить все
+            последующие запросы к API. И refreshToken, который в дальнейшем послужит для обновления accessToken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '405':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Wrong SMS code
+  /account/refresh:
+    post:
+      tags:
+        - account
+      summary: Обновление Access Token.
+      description: Позволяет обновить accessToken с помошью refreshToken.
+      operationId: authRefresh
+      requestBody:
+        description: Json с refreshToken
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRefreshPayload'
+      responses:
+        '200':
+          description: >-
+            В ответе получем accessToken c помошью которого будут проиходить все
+            последующие запросы к API. И refreshToken, который в дальнейшем послужит для обновления accessToken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '405':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Wrong SMS code                
+  /product:
+    get:
+      tags:
+        - products
+      summary: Загрузка требуемых продуктов
+      operationId: fetchProducts
+      parameters:
+        - $ref: '#/components/parameters/offsetParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/productFilterParam'
+        - name: _ids
+          in: query
+          description: >-
+            Массив id продуктов
+          required: false
+          schema:
+           type: array
+           items:
+            type: string
+          style: form
+          explode: false
+          examples:
+            oneId:
+              summary: Example of a single ID
+              value: [5]
+            multipleIds:
+              summary: Example of multiple IDs
+              value: [1, 5, 7]           
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductsResponse'
+        '400':
+          description: Invalid status value
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Ошибка сервера
+        '404':
+          description: No Content
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Ничего не найдено
+      security:
+        - JWT: []
+  /product/{productsID}:
+    get:
+      tags:
+        - products
+      summary: Загрузка продукта по productID
+      description: Возвашает одиночный продукт
+      operationId: getproductsById
+      security:
+        - JWT: []
+      parameters:
+        - name: productsID
+          in: path
+          description: ID продукта
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Неверный формат ID
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Неверный формат ID
+        '404':
+          description: Продукта не найдено
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Продукта не найдено
+  /user/current:
+    get:
+      tags:
+        - user
+      summary: Получение юзера
+      security:
+        - JWT: []      
+      operationId: fetchUser
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/User'
+  /user/current/address:
+    get:
+      tags:
+        - user
+      summary: Получение списка адресов юзера.
+      description: Данный endpoint позволяет получить список адресов юзера.
+      operationId: addUserNewAdress1
+      security:
+        - JWT: []      
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+               type: array
+               items:
+                $ref: '#/components/schemas/Address'
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Не удалось добавить новый адрес  
+    post:
+      tags:
+        - user
+      summary: Добавление нового адреса в сохраненые адреса юзера.
+      description: Данный endpoint добавить новый адрес для юзера.
+      operationId: addUserNewAdress2
+      security:
+        - JWT: []      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressPayload'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Не удалось добавить новый адрес
+  /user/current/address/{addressID}:   
+    put:
+      tags:
+        - user
+      summary: Обновление адреса юзера.
+      description: Данный endpoint добавить обновить адрес для юзера.
+      operationId: addUserNewAdress3
+      parameters:
+        - name: addressID
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 1
+          description: The address ID          
+      security:
+        - JWT: []      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Address'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Не удалось добавить новый адрес 
+    delete:
+      tags:
+        - user
+      summary: Удаление адреса юзера.
+      description: Данный endpoint добавить удалить адрес для юзера.
+      operationId: addUserNewAdress4
+      parameters:
+        - name: addressID
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 1
+          description: The address ID  
+      security:
+        - JWT: []
+      responses:
+        '200':
+          description: Success
+          content:
+             text/plain:
+              schema:
+                type: string
+                example: Адрес удален
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Не удалось добавить новый адрес
+  /user/current/orders:
+    get:
+      tags:
+        - user
+      summary: Получение списка заказов юзера.
+      security:
+        - JWT: []      
+      description: Данный endpoint позволяет получить список заказов юзера.
+      operationId: userOrders
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '405':
+          description: Failed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Не удалось получить список адресов
+  /order:
+    post:
+      tags:
+        - order
+      summary: Создание заказала
+      security:
+        - JWT: []      
+      operationId: basketCheckProducts
+      description: Позволяет проверить наличие товаров перед оформлением заказа
+      requestBody:
+        description: >-
+          В теле запроса передется массив объектов BasketProductPayload, которые
+          содержат поля productID и quantity, которое определяет требуемое
+          кол-во товара.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+               $ref: '#/components/schemas/Order'
+      responses:
+        '200':
+          description: >-
+            В ответе возврашается массив объект Order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Неудалось проверить список товаров
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                example:
+                  message: Неудалось проверить список товаров
+components:
+  parameters:
+    productFilterParam:
+      in: query
+      name: product      
+      required: false
+      explode: true
+      schema:
+          $ref: '#/components/schemas/Product'
+      description: Фильтрация ответа по полям продукта. Example ?title=Product1&position=topList
+    offsetParam:
+      in: query
+      name: _offset
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: The number of items to skip before starting to collect the result set.
+    limitParam:
+      in: query
+      name: _limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+      description: The numbers of items to return.
+    filterParam:
+      in: query
+      name: _filter
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+      description: The numbers of items to return. 
+  examples:
+    ProductExample1:
+      summary: Product Example 1
+      value:
+        productID: acde070d-8c4c-4f0d-9d8a-162843c10333
+        productTitle: Краска
+        productShortDescription: Краска для покрытия
+        productFullDescription: Краска для покрытия 2кг
+        productPrice: 200.99
+        productDescription: A small widget
+        productMainImageURL: https://example.com/widget.jpg
+  schemas:
+    AuthPayload:
+      type: object
+      properties:
+        phoneNumber:
+          type: string
+          example: 79203138017
+        smsCode:
+          type: string
+          example: 123456
+      required:
+        - phoneNumber
+        - smsCode
+    AuthRefreshPayload:
+      type: object
+      properties:
+        refreshToken:  
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      required:
+        - refreshToken
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:  
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      required:
+        - accessToken
+        - refreshToken
+    ProductsResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+      required:
+        - products
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          example: acde070d-8c4c-4f0d-9d8a-162843c10333
+        title:
+          type: string
+          example: Product 1
+        shortDescription:
+          type: string
+          example: Product Short Description
+        fullDescription:
+          type: string
+          example: Product Full Description
+        specification:
+          $ref: '#/components/schemas/ProductSpecification'
+        position: 
+         $ref: '#/components/schemas/ProductPosition'
+        price:
+          type: number
+          format: double
+          example: 200.99
+        mainImageURL:
+          type: string
+          format: uri
+          example: https://image.com
+        additionalImages:
+          type: array
+          items:
+            type: string
+            format: uri
+            example:
+              - https://image1.com
+              - https://image2.com
+              - https://image3.com
+        badge:
+          allOf:
+            - $ref: '#/components/schemas/ProductBadge'
+          description: Can be `null`. Если у продукта нет никакой наклейки
+      description: Объект, который описывает параметры продукта
+    ProductPosition:
+      description: Объект, который описывает положение продукта
+      type: string
+      example: topList
+      enum:
+        - topList
+        - mainList
+    ProductBadge:
+      type: object
+      properties:
+        badgeType:
+          type: string
+          enum:
+            - discount
+            - new
+        badgeValue:
+          type: string
+          example: '-5%'
+      required:
+        - badgeType
+    ProductSpecification:
+      type: object
+      example:
+        Цвет: Белый
+        Консистенция: паста
+        Вместимость: 2 кг
+        Страна производитель: Россия
+    AddressPayload:
+      type: object
+      properties:
+        street:
+          type: string
+          example: 437 Lytton
+        city:
+          type: string
+          example: Palo Alto
+        region:
+          type: string
+          example: CA
+        zip:
+          type: string
+          example: '94301'
+        latitude:
+          type: number
+          format: float
+          example: 41.8781
+        longitude:
+          type: number
+          format: float
+          example: -87.6298
+      required:
+        - longitude
+        - latitude
+        - zip
+        - city
+        - street
+    Address:
+      type: object
+      properties:
+        addressID:
+          type: string
+          example: 1
+        street:
+          type: string
+          example: 437 Lytton
+        city:
+          type: string
+          example: Palo Alto
+        region:
+          type: string
+          example: CA
+        zip:
+          type: string
+          example: '94301'
+        latitude:
+          type: number
+          format: float
+          example: 41.8781
+        longitude:
+          type: number
+          format: float
+          example: -87.6298
+      required:
+        - longitude
+        - latitude
+        - zip
+        - city
+        - street
+        - addressID
+    Order:
+      type: object
+      properties:
+        orderID:
+          type: string
+          example: 213829121-213123
+          nullable: true
+          description: Can be `null`. When create order.
+        orederTimestamp:
+          type: string
+          format: date-time
+          example: '2023-05-02T12:30:45Z'
+          nullable: true
+          description: Can be `null`. When create order.
+        orderProducts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        orderTotalSum:
+          type: number
+          format: float
+          example: 202032.21
+          nullable: true
+          description: Can be `null`. When create order.
+        orderAdress:
+          $ref: '#/components/schemas/Address'
+        orderStatus:
+          type: string
+          enum:
+            - created
+            - inProgress
+            - inDelivery
+            - completed
+          nullable: true
+          description: Can be `null`. When create order.
+        orderAdditionalComment:
+          type: string
+          example: Дополнитеьная информация о заказе
+          nullable: true
+          description: Can be `null`. When create order.
+    Order.CreateNew:
+      type: object
+      properties:
+        orderProductsIDs:
+          type: array
+          items:
+            type: string
+          example:
+            - acde070d-8c4c-4f0d-9d8a-162843c10331
+            - acde070d-8c4c-4f0d-9d8a-162843c10332
+            - acde070d-8c4c-4f0d-9d8a-162843c10333
+        orderAdress:
+          $ref: '#/components/schemas/Address'
+        orderAdditionalComment:
+          type: string
+          example: Дополнитеьная информация о заказе
+          nullable: true
+          description: Can be `null`. When create order.
+    User:
+      type: object
+      properties:
+        userID:
+          type: string
+          example: 213892asd213
+        username:
+          type: string
+          example: theUser1
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: James
+        email:
+          type: string
+          example: john@email.com
+        password:
+          type: string
+          example: '123454321'
+        phoneNumber:
+          type: string
+          example: '792031380'
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+      required:
+        - userID
+        - username
+        - firstName
+        - password
+        - phoneNumber
+  securitySchemes:
+    JWT:
+      type: http
+      scheme: bearer
+      description: JSON Web Token (JWT) for API authentication
+      bearerFormat: JWT
+      
